@@ -1,0 +1,184 @@
+---
+title: "Practical Machine Learning Assignment"
+author: "Saurabh Arora"
+date: "3 July 2016"
+output: 
+  html_document: 
+    self_contained: no
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,fig.path = "fig/")
+```
+
+## Preface 
+
+This document is written as part of assignment for coursera course on practical machine learning. The document cmontains data from Human Activity Recognition data set as published in site link <http://rmarkdown.rstudio.com>.
+
+##Introduction
+
+As part of our Human activity recognition dataset provided for this exercise, we need to identify user activity based on readings of behaviour provided.
+
+##Data Exploration
+
+Lets us start with loading and exploring the data.
+
+```{r }
+
+library("caret")
+library("dplyr")
+library("randomForest")
+library(doMC)
+registerDoMC(cores = 2)
+
+
+if (!file.exists("./pml-training.csv")) {
+  fileurl <-
+    "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+  download.file(fileurl, "./pml-training.csv", method = "curl")
+}
+
+if (!file.exists("./pml-testing.csv")) {
+  fileurl <-
+    "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+  download.file(fileurl, "./pml-testing.csv", method = "curl")
+}
+
+trainset <- read.csv(file = "./pml-training.csv", header = TRUE)
+testset  <- read.csv(file = "./pml-testing.csv", header = TRUE)
+
+```
+
+The total no of records in training set are `r nrow(trainset)` and no of variables are `r ncol(trainset)`. This is a hugh set of data but as we look deeper we find that we have a large number of NA in the record. This would means that we have redundant features that can be ignored in model generations.
+
+###Cleaning
+
+We start by removing the redundant variables X,raw_timestamp_part_1,raw_timestamp_part_2,
+   cvtd_timestamp,new_window,num_window,user_name and converting the variable classe to a factor.
+   
+```{r}
+
+removeredunt <-
+  trainset %>% select(
+    -X,
+    -raw_timestamp_part_1,
+    -raw_timestamp_part_2,
+    -cvtd_timestamp,
+    -new_window,
+    -num_window,
+    -user_name,
+    -classe
+  )
+
+removeredunt$classe <- as.factor(trainset$classe)
+
+#remove varible with all NA
+withoutallna <- removeredunt[, colSums(is.na(removeredunt)) == 0]
+dim(withoutallna)
+
+```
+This has reduced the features to almost half the original set.We further use nearZeroVar to remove features which have near Zero var and hence donot contribute much to the models.
+
+```{r}
+
+nearzero <- nearZeroVar(withoutallna, saveMetrics = TRUE)
+cleaned <- withoutallna[, nearzero[, "nzv"] == FALSE]
+dim(cleaned)
+```
+
+## Training data Creation
+
+Since we have drastically reduced the datasets, removing all redundant features. We should now divide the data into Training and validation set.
+
+```{r}
+
+#default seed
+set.seed(1234)
+
+inTraining <-
+  createDataPartition(cleaned$classe, p = .7, list = FALSE)
+
+trainsetwithoutna <- cleaned[inTraining, ]
+validation <- cleaned[-inTraining, ]
+dim(trainsetwithoutna)
+```
+
+Before we generate the model, lets see the correlation among the various variable using the correlation plot.
+
+```{r fig.height=8,fig.width=8 }
+levelplot(cor(trainsetwithoutna %>% select(-classe)),scales=list(x=list(rot=90), cex=0.8) )
+```
+
+## Model Training
+
+We would be running two models on the training data and choose the one that make better prediction.
+
+###Decision Tree
+We first start by training a decision tree model on the data. The code below generates the model ,we have also precomputed and save the model for faster processing.
+
+```{r}
+if (!file.exists("./baserpart.rds")) {
+start <- Sys.time()
+set.seed(1234)
+dtmodel <- train(classe~.,data=trainsetwithoutna,method="rpart");
+
+end <- Sys.time()
+
+end - start 
+} else {
+  dtmodel <- readRDS(file = "./baserpart.rds")
+}
+
+```
+
+
+The graphical representation of model is given below.
+```{r echo= FALSE}
+plot(dtmodel$finalModel,uniform = TRUE,main="Classification Tree")
+text(dtmodel$finalModel,use.n = TRUE,all=TRUE,cex=.8)
+```
+
+The Confusion Matrix of the model on the validation set is computed below
+```{r}
+confusionMatrix(predict(dtmodel,validation),validation$classe)
+```
+The accuracy is quite low in this case using decision tree.
+
+###Random Forest
+We would now train the same data on a random forest model. As earlier, we have precomputed and saved the model whi
+```{r}
+if (!file.exists("./baserf.rds")) {
+start <- Sys.time()
+set.seed(1234)
+rfmodel <-
+  train(
+    classe ~ .,
+    data = trainsetwithoutna,
+    method = "rf",
+    verboseIter = TRUE,
+    allowparallel = TRUE,
+    prox = TRUE
+  )
+
+end <- Sys.time()
+
+end - start 
+} else {
+  rfmodel <- readRDS(file = "./baserf.rds")
+}
+```
+
+The Confusion Matrix of the model on the validation set is computed below
+```{r}
+confusionMatrix(predict(rfmodel,validation),validation$classe)
+```
+The accuracy of the random forest model is quite high.
+```{r}
+varImpPlot(rfmodel$finalModel,main="Random Forest Model Plot")
+```
+
+
+##Conclusion
+
+The random forest model presented in this case provide a high accuracy on the data. The human activity Recongnition can be model completed by this process.

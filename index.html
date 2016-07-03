@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+
+<meta name="author" content="Saurabh Arora" />
+
+
+<title>Practical Machine Learning Assignment</title>
+
+<script src="index_files/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="index_files/bootstrap-3.3.5/css/bootstrap.min.css" rel="stylesheet" />
+<script src="index_files/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="index_files/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="index_files/bootstrap-3.3.5/shim/respond.min.js"></script>
+
+<style type="text/css">code{white-space: pre;}</style>
+<link rel="stylesheet"
+      href="index_files/highlight/default.css"
+      type="text/css" />
+<script src="index_files/highlight/highlight.js"></script>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs && document.readyState && document.readyState === "complete") {
+   window.setTimeout(function() {
+      hljs.initHighlighting();
+   }, 0);
+}
+</script>
+
+
+
+<style type="text/css">
+h1 {
+  font-size: 34px;
+}
+h1.title {
+  font-size: 38px;
+}
+h2 {
+  font-size: 30px;
+}
+h3 {
+  font-size: 24px;
+}
+h4 {
+  font-size: 18px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 12px;
+}
+.table th:not([align]) {
+  text-align: left;
+}
+</style>
+
+
+</head>
+
+<body>
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img {
+  max-width:100%;
+  height: auto;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+</style>
+
+
+<div class="container-fluid main-container">
+
+<!-- tabsets -->
+<script src="index_files/navigation-1.0/tabsets.js"></script>
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+</script>
+
+<!-- code folding -->
+
+
+
+
+
+
+<div class="fluid-row" id="header">
+
+
+
+<h1 class="title toc-ignore">Practical Machine Learning Assignment</h1>
+<h4 class="author"><em>Saurabh Arora</em></h4>
+<h4 class="date"><em>3 July 2016</em></h4>
+
+</div>
+
+<div id="TOC">
+<ul>
+<li><a href="#preface">Preface</a></li>
+<li><a href="#introduction">Introduction</a></li>
+<li><a href="#data-exploration">Data Exploration</a><ul>
+<li><a href="#cleaning">Cleaning</a></li>
+</ul></li>
+<li><a href="#training-data-creation">Training data Creation</a></li>
+<li><a href="#model-training">Model Training</a><ul>
+<li><a href="#decision-tree">Decision Tree</a></li>
+<li><a href="#random-forest">Random Forest</a></li>
+</ul></li>
+<li><a href="#conclusion">Conclusion</a></li>
+</ul>
+</div>
+
+<div id="preface" class="section level2">
+<h2>Preface</h2>
+<p>This document is written as part of assignment for coursera course on practical machine learning. The document cmontains data from Human Activity Recognition data set as published in site link <a href="http://rmarkdown.rstudio.com" class="uri">http://rmarkdown.rstudio.com</a>.</p>
+</div>
+<div id="introduction" class="section level2">
+<h2>Introduction</h2>
+<p>As part of our Human activity recognition dataset provided for this exercise, we need to identify user activity based on readings of behaviour provided.</p>
+</div>
+<div id="data-exploration" class="section level2">
+<h2>Data Exploration</h2>
+<p>Lets us start with loading and exploring the data.</p>
+<pre class="r"><code>library(&quot;caret&quot;)</code></pre>
+<pre><code>## Loading required package: lattice</code></pre>
+<pre><code>## Loading required package: ggplot2</code></pre>
+<pre class="r"><code>library(&quot;dplyr&quot;)</code></pre>
+<pre><code>## 
+## Attaching package: &#39;dplyr&#39;</code></pre>
+<pre><code>## The following objects are masked from &#39;package:stats&#39;:
+## 
+##     filter, lag</code></pre>
+<pre><code>## The following objects are masked from &#39;package:base&#39;:
+## 
+##     intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>library(&quot;randomForest&quot;)</code></pre>
+<pre><code>## randomForest 4.6-12</code></pre>
+<pre><code>## Type rfNews() to see new features/changes/bug fixes.</code></pre>
+<pre><code>## 
+## Attaching package: &#39;randomForest&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:dplyr&#39;:
+## 
+##     combine</code></pre>
+<pre><code>## The following object is masked from &#39;package:ggplot2&#39;:
+## 
+##     margin</code></pre>
+<pre class="r"><code>library(doMC)</code></pre>
+<pre><code>## Loading required package: foreach</code></pre>
+<pre><code>## Loading required package: iterators</code></pre>
+<pre><code>## Loading required package: parallel</code></pre>
+<pre class="r"><code>registerDoMC(cores = 2)
+
+
+if (!file.exists(&quot;./pml-training.csv&quot;)) {
+  fileurl &lt;-
+    &quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv&quot;
+  download.file(fileurl, &quot;./pml-training.csv&quot;, method = &quot;curl&quot;)
+}
+
+if (!file.exists(&quot;./pml-testing.csv&quot;)) {
+  fileurl &lt;-
+    &quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv&quot;
+  download.file(fileurl, &quot;./pml-testing.csv&quot;, method = &quot;curl&quot;)
+}
+
+trainset &lt;- read.csv(file = &quot;./pml-training.csv&quot;, header = TRUE)
+testset  &lt;- read.csv(file = &quot;./pml-testing.csv&quot;, header = TRUE)</code></pre>
+<p>The total no of records in training set are 19622 and no of variables are 160. This is a hugh set of data but as we look deeper we find that we have a large number of NA in the record. This would means that we have redundant features that can be ignored in model generations.</p>
+<div id="cleaning" class="section level3">
+<h3>Cleaning</h3>
+<p>We start by removing the redundant variables X,raw_timestamp_part_1,raw_timestamp_part_2, cvtd_timestamp,new_window,num_window,user_name and converting the variable classe to a factor.</p>
+<pre class="r"><code>removeredunt &lt;-
+  trainset %&gt;% select(
+    -X,
+    -raw_timestamp_part_1,
+    -raw_timestamp_part_2,
+    -cvtd_timestamp,
+    -new_window,
+    -num_window,
+    -user_name,
+    -classe
+  )
+
+removeredunt$classe &lt;- as.factor(trainset$classe)
+
+#remove varible with all NA
+withoutallna &lt;- removeredunt[, colSums(is.na(removeredunt)) == 0]
+dim(withoutallna)</code></pre>
+<pre><code>## [1] 19622    86</code></pre>
+<p>This has reduced the features to almost half the original set.We further use nearZeroVar to remove features which have near Zero var and hence donot contribute much to the models.</p>
+<pre class="r"><code>nearzero &lt;- nearZeroVar(withoutallna, saveMetrics = TRUE)
+cleaned &lt;- withoutallna[, nearzero[, &quot;nzv&quot;] == FALSE]
+dim(cleaned)</code></pre>
+<pre><code>## [1] 19622    53</code></pre>
+</div>
+</div>
+<div id="training-data-creation" class="section level2">
+<h2>Training data Creation</h2>
+<p>Since we have drastically reduced the datasets, removing all redundant features. We should now divide the data into Training and validation set.</p>
+<pre class="r"><code>#default seed
+set.seed(1234)
+
+inTraining &lt;-
+  createDataPartition(cleaned$classe, p = .7, list = FALSE)
+
+trainsetwithoutna &lt;- cleaned[inTraining, ]
+validation &lt;- cleaned[-inTraining, ]
+dim(trainsetwithoutna)</code></pre>
+<pre><code>## [1] 13737    53</code></pre>
+<p>Before we generate the model, lets see the correlation among the various variable using the correlation plot.</p>
+<pre class="r"><code>levelplot(cor(trainsetwithoutna %&gt;% select(-classe)),scales=list(x=list(rot=90), cex=0.8) )</code></pre>
+<p><img src="fig/unnamed-chunk-5-1.png" width="768" /></p>
+</div>
+<div id="model-training" class="section level2">
+<h2>Model Training</h2>
+<p>We would be running two models on the training data and choose the one that make better prediction.</p>
+<div id="decision-tree" class="section level3">
+<h3>Decision Tree</h3>
+<p>We first start by training a decision tree model on the data. The code below generates the model ,we have also precomputed and save the model for faster processing.</p>
+<pre class="r"><code>if (!file.exists(&quot;./baserpart.rds&quot;)) {
+start &lt;- Sys.time()
+set.seed(1234)
+dtmodel &lt;- train(classe~.,data=trainsetwithoutna,method=&quot;rpart&quot;);
+
+end &lt;- Sys.time()
+
+end - start 
+} else {
+  dtmodel &lt;- readRDS(file = &quot;./baserpart.rds&quot;)
+}</code></pre>
+<p>The graphical representation of model is given below. <img src="fig/unnamed-chunk-7-1.png" width="672" /></p>
+<p>The Confusion Matrix of the model on the validation set is computed below</p>
+<pre class="r"><code>confusionMatrix(predict(dtmodel,validation),validation$classe)</code></pre>
+<pre><code>## Loading required package: rpart</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1530  486  493  452  168
+##          B   35  379   31  164  145
+##          C  105  274  502  348  302
+##          D    0    0    0    0    0
+##          E    4    0    0    0  467
+## 
+## Overall Statistics
+##                                           
+##                Accuracy : 0.489           
+##                  95% CI : (0.4762, 0.5019)
+##     No Information Rate : 0.2845          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.3311          
+##  Mcnemar&#39;s Test P-Value : NA              
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.9140   0.3327   0.4893   0.0000  0.43161
+## Specificity            0.6203   0.9210   0.7882   1.0000  0.99917
+## Pos Pred Value         0.4890   0.5027   0.3279      NaN  0.99151
+## Neg Pred Value         0.9478   0.8519   0.8797   0.8362  0.88641
+## Prevalence             0.2845   0.1935   0.1743   0.1638  0.18386
+## Detection Rate         0.2600   0.0644   0.0853   0.0000  0.07935
+## Detection Prevalence   0.5317   0.1281   0.2602   0.0000  0.08003
+## Balanced Accuracy      0.7671   0.6269   0.6388   0.5000  0.71539</code></pre>
+<p>The accuracy is quite low in this case using decision tree.</p>
+</div>
+<div id="random-forest" class="section level3">
+<h3>Random Forest</h3>
+<p>We would now train the same data on a random forest model. As earlier, we have precomputed and saved the model whi</p>
+<pre class="r"><code>if (!file.exists(&quot;./baserf.rds&quot;)) {
+start &lt;- Sys.time()
+set.seed(1234)
+rfmodel &lt;-
+  train(
+    classe ~ .,
+    data = trainsetwithoutna,
+    method = &quot;rf&quot;,
+    verboseIter = TRUE,
+    allowparallel = TRUE,
+    prox = TRUE
+  )
+
+end &lt;- Sys.time()
+
+end - start 
+} else {
+  rfmodel &lt;- readRDS(file = &quot;./baserf.rds&quot;)
+}</code></pre>
+<p>The Confusion Matrix of the model on the validation set is computed below</p>
+<pre class="r"><code>confusionMatrix(predict(rfmodel,validation),validation$classe)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1673    8    0    0    0
+##          B    1 1130    7    0    0
+##          C    0    1 1017   13    1
+##          D    0    0    2  950    1
+##          E    0    0    0    1 1080
+## 
+## Overall Statistics
+##                                           
+##                Accuracy : 0.9941          
+##                  95% CI : (0.9917, 0.9959)
+##     No Information Rate : 0.2845          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.9925          
+##  Mcnemar&#39;s Test P-Value : NA              
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.9994   0.9921   0.9912   0.9855   0.9982
+## Specificity            0.9981   0.9983   0.9969   0.9994   0.9998
+## Pos Pred Value         0.9952   0.9930   0.9855   0.9969   0.9991
+## Neg Pred Value         0.9998   0.9981   0.9981   0.9972   0.9996
+## Prevalence             0.2845   0.1935   0.1743   0.1638   0.1839
+## Detection Rate         0.2843   0.1920   0.1728   0.1614   0.1835
+## Detection Prevalence   0.2856   0.1934   0.1754   0.1619   0.1837
+## Balanced Accuracy      0.9988   0.9952   0.9941   0.9924   0.9990</code></pre>
+<p>The accuracy of the random forest model is quite high.</p>
+<pre class="r"><code>varImpPlot(rfmodel$finalModel,main=&quot;Random Forest Model Plot&quot;)</code></pre>
+<p><img src="fig/unnamed-chunk-11-1.png" width="672" /></p>
+</div>
+</div>
+<div id="conclusion" class="section level2">
+<h2>Conclusion</h2>
+<p>The random forest model presented in this case provide a high accuracy on the data. The human activity Recongnition can be model completed by this process.</p>
+</div>
+
+
+
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+$(document).ready(function () {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+});
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
